@@ -12,10 +12,12 @@ elif [[ -n "${1:-}" ]]; then
     exit 2
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
-    echo "Docker non è disponibile nel PATH." >&2
-    exit 1
-fi
+for required_command in docker mktemp grep; do
+    if ! command -v "$required_command" >/dev/null 2>&1; then
+        printf 'Comando richiesto non disponibile: %s\n' "$required_command" >&2
+        exit 1
+    fi
+done
 
 if ! docker info >/dev/null 2>&1; then
     echo "Il daemon Docker non è raggiungibile." >&2
@@ -38,37 +40,50 @@ run_target() {
     local package_manager="$4"
     local container="setup-matrix-${target}-$$"
     local output_log
+    local container_created=0
 
     output_log="$(mktemp)"
     printf '\n========== %s (%s) ==========\n' "$target" "$image"
 
     if (( BUILD_IMAGES )); then
-        docker build -f "${ROOT_DIR}/test/${target}/Dockerfile" -t "$image" "$ROOT_DIR"
+        if ! docker build -f "${ROOT_DIR}/test/${target}/Dockerfile" -t "$image" "$ROOT_DIR"; then
+            rm -f "$output_log"
+            return 1
+        fi
     fi
 
-    docker run -d \
+    if ! docker run -d \
         --name "$container" \
         -v "${ROOT_DIR}/setup-terminal.sh:/tmp/setup-terminal.sh:ro" \
-        "$image" bash -c 'sleep infinity' >/dev/null
+        "$image" bash -c 'sleep infinity' >/dev/null; then
+        rm -f "$output_log"
+        return 1
+    fi
+    container_created=1
+
+    cleanup_target() {
+        if (( container_created )); then
+            docker rm -f "$container" >/dev/null 2>&1 || true
+            container_created=0
+        fi
+        rm -f "$output_log"
+    }
 
     if ! docker exec "$container" bash /tmp/setup-terminal.sh >"$output_log" 2>&1; then
         cat "$output_log"
-        docker rm -f "$container" >/dev/null 2>&1 || true
-        rm -f "$output_log"
+        cleanup_target
         return 1
     fi
     cat "$output_log"
     if ! grep -Fq "Famiglia: ${family}; package manager: ${package_manager}" "$output_log"; then
         echo "Rilevamento piattaforma inatteso per $target." >&2
-        docker rm -f "$container" >/dev/null 2>&1 || true
-        rm -f "$output_log"
+        cleanup_target
         return 1
     fi
 
     if ! docker exec "$container" bash /tmp/setup-terminal.sh >"$output_log" 2>&1; then
         cat "$output_log"
-        docker rm -f "$container" >/dev/null 2>&1 || true
-        rm -f "$output_log"
+        cleanup_target
         return 1
     fi
     cat "$output_log"
@@ -92,16 +107,14 @@ test ! -s /tmp/zsh-startup.err
 script -qec 'zsh -i -c "bindkey \"^R\""' /dev/null >/tmp/zsh-tty.out
 grep -Fq history-incremental-search-backward /tmp/zsh-tty.out
 CONTAINER_TEST
-    then
-        echo "Verifiche funzionali fallite per $target." >&2
-        docker rm -f "$container" >/dev/null 2>&1 || true
-        rm -f "$output_log"
-        return 1
-    fi
+then
+    echo "Verifiche funzionali fallite per $target." >&2
+    cleanup_target
+    return 1
+fi
 
-    docker rm -f "$container" >/dev/null
-    rm -f "$output_log"
-    printf '[PASS] %s\n' "$target"
+cleanup_target
+printf '[PASS] %s\n' "$target"
 }
 
 for target_spec in "${targets[@]}"; do

@@ -72,7 +72,20 @@ x86_64 hardware or every supported target distribution and architecture.
 ## Container testing
 
 Test images are provided for Rocky Linux 8, 9, and 10, Debian 13, and Ubuntu
-24.04. Build the image for the target platform from the repository root:
+24.04. Build all images and run the automated setup/configuration checks from
+the repository root with:
+
+```bash
+test/run-matrix.sh
+```
+
+The runner builds each image, runs the setup twice in the same container, and
+checks platform/package-manager detection, Zsh configuration syntax, unique
+managed-block markers, generated aliases, availability of Eza/lazygit/
+lazydocker/Yazi, non-TTY interactive startup, and the fzf Ctrl-R binding in a
+TTY. It removes each temporary container after the checks. Docker and a
+reachable Docker daemon are required. Use `test/run-matrix.sh --no-build` to
+reuse the existing `developer-*-test` images; build each image manually with:
 
 ```bash
 docker build -f test/el8/Dockerfile -t developer-el8 .
@@ -104,8 +117,9 @@ Remove the test container when finished:
 docker rm -f el9-setup-test
 ```
 
-The Dockerfile uses the host's native architecture. The tested image in this
-project was `linux/arm64`; that verifies execution in Docker Desktop's ARM64
+The Dockerfiles use the host's native architecture. The matrix runner has
+passed on Rocky Linux 8/9/10, Debian 13, and Ubuntu 24.04 in Docker Desktop's
+ARM64 environment. This verifies those images on the current ARM64 Docker
 environment, not on every ARM server or hardware model. An emulated
 `--platform linux/amd64` test is useful for compatibility checks but does not
 replace testing on a real x86_64 target.

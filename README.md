@@ -1,149 +1,139 @@
-# Developer terminal bootstrap for EL 9
+# Developer Shell Setup
 
-`setup-terminal.sh` configures a Zsh developer environment on the tested
-container targets Rocky Linux 8, 9, and 10; Debian 13; and Ubuntu 24.04. Its EL
-package flow is also designed for AlmaLinux and RHEL 8, 9, and 10, but those
-distributions are not yet covered by the container test matrix. Run it as a
-regular user with working `sudo` access:
+`setup-terminal.sh` prepares a practical Zsh environment for day-to-day use on
+your Linux machine. It installs the system packages it needs, configures
+[Oh My Zsh](https://ohmyz.sh/) with useful plugins and the Powerlevel10k theme,
+adds optional command-line tools, and writes a set of shell aliases. It is
+designed to be run directly by a regular user on the machine you want to
+configure, not as a Docker entrypoint.
+
+## Supported platforms
+
+The script recognizes and has been tested on:
+
+- Enterprise Linux (EL) family: Rocky Linux 8, 9, and 10
+- Debian 10, 11, 12, and 13
+- Ubuntu 22.04, 24.04, and 26.04
+
+Debian 10 and 11 are end-of-life legacy compatibility targets and are not
+recommended for new installations. The EL package flow is also designed for
+AlmaLinux and RHEL 8, 9, and 10, but those distributions are not included in
+the test matrix. Here, EL means the Enterprise Linux family. Automatic
+EPEL/CRB setup applies only to Rocky Linux and AlmaLinux 9; repository
+configuration on RHEL is left to the administrator.
+
+Optional package availability depends on the enabled repositories and
+architecture. If an optional package is unavailable, the script reports a
+warning; Eza, Yazi, lazygit, and lazydocker have pinned upstream release
+fallbacks for aarch64/ARM64 and x86_64. Downloads are SHA-256 verified before
+installation under `~/.local/bin`.
+
+## Run on your machine
+
+Requirements:
+
+- A supported Linux distribution and Bash
+- A regular user account with working `sudo` access
+- Network access to the configured package repositories and GitHub
+
+Review the script, then run it as your regular user from the repository:
 
 ```bash
 bash setup-terminal.sh
 ```
 
-The script installs essential system packages, Oh My Zsh, Zsh plugins, and
-Powerlevel10k. Optional command-line tools are enabled by default. To skip
-those tools and the related automatic EPEL/CRB setup:
+Do not run it as root. The script asks `sudo` for permission when system
+packages or supported EL9 repositories need to be changed.
+
+Optional command-line tools are installed by default. To skip them:
 
 ```bash
 INSTALL_OPTIONAL_TOOLS=0 bash setup-terminal.sh
 ```
 
-To skip Powerlevel10k:
+Powerlevel10k is also enabled by default. To use Oh My Zsh without that theme:
 
 ```bash
 INSTALL_POWERLEVEL10K=0 bash setup-terminal.sh
 ```
 
-The script reports the detected distribution, platform family, and package
-manager before making system changes. Essential and optional package names are
-mapped for DNF and APT. Rocky/AlmaLinux 9 repository setup remains limited to
-EPEL and CRB; other EL versions do not receive automatic repository changes.
-Unavailable Eza, Yazi, lazygit, and lazydocker packages use their pinned,
-checksum-verified upstream releases when supported by the target architecture.
+The script adds or updates a marked section in `~/.zshrc`, writes aliases to
+`~/.config/developer-shell/aliases.zsh`, and backs up existing files before
+changing them. It attempts to make Zsh your login shell when possible; if the
+system does not allow that, start it with `zsh`. Read the final summary for
+optional-tool warnings or steps that need attention.
 
-Automatic EPEL and CRB configuration is limited to Rocky Linux 9 and AlmaLinux
-9. RHEL is supported for the base shell setup, but repository configuration is
-left to the system administrator. Optional package availability depends on the
-target's enabled repositories; unavailable tools are reported as warnings.
-The script does not add third-party repositories outside the explicitly
-supported EL9 EPEL/CRB setup or install unverified binaries. If Eza is
-unavailable from the package manager, the script downloads the pinned official
-Eza v0.23.5 Linux release for aarch64/ARM64 or x86_64, verifies its SHA-256
-digest, and installs it under `~/.local/bin`.
+The optional tools are fzf, bat, ripgrep, btop, Neovim, zoxide, Eza, lazygit,
+lazydocker, git-delta, micro, and Yazi. Eza is the maintained successor to
+exa. Yazi's fallback uses the upstream musl build; lazydocker also needs a
+working Docker CLI and daemon to be useful.
 
-Eza is the maintained successor to exa; upstream marks exa as unmaintained.
-When Eza is available, the generated Zsh aliases use it for `ls`, `ll`, `la`,
-and `l`.
+Oh My Zsh, its plugins, Powerlevel10k, and the upstream binary fallbacks are
+pinned to specific revisions or versions. Updating them requires reviewing
+the corresponding references and checksums in `setup-terminal.sh`.
 
-If the package manager cannot provide Yazi, the script downloads the pinned
-official Yazi v26.9.1 Linux musl release for aarch64/ARM64 or x86_64, verifies
-its SHA-256 digest, and installs both `yazi` and its companion `ya` under
-`~/.local/bin`. The musl build avoids depending on a newer glibc than Rocky
-Linux 9 provides.
+## Test across Linux platforms with Docker
 
-If the package manager cannot provide lazygit, the script downloads the pinned
-official lazygit v0.66.0 Linux release for aarch64/ARM64 or x86_64, verifies
-its SHA-256 digest, and installs it under `~/.local/bin`.
+Docker is only used here to test the setup script against disposable
+environments; it is not required to run the script on your own machine. The
+Dockerfiles under `test/` provide one test image per distribution version:
 
-If the package manager cannot provide lazydocker, the script downloads the
-pinned official lazydocker v0.25.2 Linux release for aarch64/ARM64 or x86_64,
-verifies its SHA-256 digest, and installs it under `~/.local/bin`. Running
-lazydocker also requires a usable Docker CLI and daemon; the test image does
-not include them.
+```text
+test/
+├── debian/
+│   ├── 10/
+│   ├── 11/
+│   ├── 12/
+│   └── 13/
+├── el/
+│   ├── 8/
+│   ├── 9/
+│   └── 10/
+└── ubuntu/
+    ├── 22.04/
+    ├── 24.04/
+    └── 26.04/
+```
 
-The four release fallbacks have been exercised through the setup script on
-Rocky Linux 8/9/10, Debian 13, and Ubuntu 24.04 using the host's ARM64 Docker
-environment; each installed command was located in `PATH` and passed a
-`--version` invocation. The x86_64 Eza, lazygit, lazydocker, Yazi, and `ya`
-release assets were separately checksum-verified and launched on Rocky Linux
-8 with glibc 2.28. These Docker/emulation checks do not replace tests on native
-x86_64 hardware or every supported target distribution and architecture.
-
-## Container testing
-
-Test images are provided for Rocky Linux 8, 9, and 10, Debian 13, and Ubuntu
-24.04. Build all images and run the automated setup/configuration checks from
-the repository root with:
+Debian 10 and 11 test images use Debian's archive repositories because those
+releases are end-of-life. To build the images and run the setup/configuration
+checks for every target from the repository root:
 
 ```bash
 test/run-matrix.sh
 ```
 
-The runner builds each image, runs the setup twice in the same container, and
-checks platform/package-manager detection, Zsh configuration syntax, unique
-managed-block markers, generated aliases, availability of Eza/lazygit/
-lazydocker/Yazi, non-TTY interactive startup, and the fzf Ctrl-R binding in a
-TTY. It removes each temporary container after the checks. Docker and a
-reachable Docker daemon are required. Use `test/run-matrix.sh --no-build` to
-reuse the existing `developer-*-test` images; build each image manually with:
+The matrix runs the setup twice in each container, then checks platform
+detection, Zsh configuration syntax, generated aliases, optional command
+availability, interactive startup, and the fzf Ctrl-R binding in a TTY. It
+removes its temporary containers when finished. Docker and a reachable Docker
+daemon are required.
+
+To reuse previously built `developer-*-test` images:
 
 ```bash
-docker build -f test/el8/Dockerfile -t developer-el8 .
-docker build -f test/el9/Dockerfile -t developer-el9 .
-docker build -f test/el10/Dockerfile -t developer-el10 .
-docker build -f test/debian/Dockerfile -t developer-debian .
-docker build -f test/ubuntu/Dockerfile -t developer-ubuntu .
+test/run-matrix.sh --no-build
 ```
 
-Start a persistent container (replace `developer-el9` with the image being
-tested):
+To build one image manually, for example Ubuntu 24.04:
 
 ```bash
-docker run -d --name el9-setup-test \
-  -v "$PWD/setup-terminal.sh:/tmp/setup-terminal.sh:ro" \
-  developer-el9 bash -c 'sleep infinity'
+docker build -f test/ubuntu/24.04/Dockerfile -t developer-ubuntu .
 ```
 
-Run the script twice in that same container to check rerun behavior:
+The test images use the host's native architecture. The full matrix has passed
+in Docker Desktop's ARM64 environment; this does not replace testing on native
+x86_64 hardware or cover every host-specific policy, mirror, proxy, SELinux,
+identity-management, or login-shell configuration.
 
-```bash
-docker exec -it el9-setup-test bash /tmp/setup-terminal.sh
-docker exec -it el9-setup-test bash /tmp/setup-terminal.sh
-```
+## Before changing your machine
 
-Remove the test container when finished:
-
-```bash
-docker rm -f el9-setup-test
-```
-
-The Dockerfiles use the host's native architecture. The matrix runner has
-passed on Rocky Linux 8/9/10, Debian 13, and Ubuntu 24.04 in Docker Desktop's
-ARM64 environment. This verifies those images on the current ARM64 Docker
-environment, not on every ARM server or hardware model. An emulated
-`--platform linux/amd64` test is useful for compatibility checks but does not
-replace testing on a real x86_64 target.
-
-The container uses a passwordless-sudo test user. This does not validate
-interactive sudo policies, host security controls, or changes to a real user's
-login shell. The image does not install the Docker CLI or daemon: Docker aliases
-in the generated Zsh configuration are conveniences only and do not imply
-Docker is present or usable.
-
-## Before using on a real machine
-
-- Review the script before running it. It installs system packages and, on
-  Rocky/AlmaLinux 9 when optional tools are enabled, may install EPEL and enable
-  CRB using `sudo`.
-- The script updates its marked block in `~/.zshrc`, writes
-  `~/.config/developer-shell/aliases.zsh`, and backs up files before changing
-  them. Keep a separate backup of important configuration.
-- Oh My Zsh, its plugins, and Powerlevel10k are cloned at pinned Git revisions.
-  Updating them requires reviewing and changing both the requested ref and the
-  expected commit in `setup-terminal.sh`.
-- Test on a disposable system matching the target distribution and policy
-  before broad rollout. Container tests do not cover host-specific SELinux,
-  proxy, repository mirror, identity-management, or login-shell policies.
-- A successful script exit means the required setup completed; optional-tool
-  warnings and an unavailable `chsh` may still be reported. Read the final
-  summary before considering a machine fully configured.
+- Review the script before running it: it installs packages and updates shell
+  configuration. With optional tools enabled, it can also configure EPEL and
+  CRB on Rocky/AlmaLinux 9.
+- Keep a separate backup of important files even though the script backs up
+  files it changes.
+- Try it first on a disposable machine or in a test environment matching your
+  distribution and policies.
+- Containers cannot validate host-specific login-shell behavior, security
+  policy, or integration with tools and services already on your machine.

@@ -601,7 +601,9 @@ detect_platform() {
         el:rocky:8*|el:rocky:9*|el:rocky:10*|\
         el:almalinux:8*|el:almalinux:9*|el:almalinux:10*|\
         el:rhel:8*|el:rhel:9*|el:rhel:10*|\
-        debian:debian:13*|debian:ubuntu:24.04*)
+        debian:debian:10*|debian:debian:11*|debian:debian:12*|\
+        debian:debian:13*|\
+        debian:ubuntu:22.04*|debian:ubuntu:24.04*|debian:ubuntu:26.04*)
             return 0
             ;;
         *)
@@ -679,7 +681,7 @@ case "$PLATFORM_FAMILY" in
     debian)
         BASE_PACKAGES=(
             zsh git ca-certificates iproute2 procps util-linux findutils
-            diffutils which hostname tar gzip unzip
+            diffutils hostname tar gzip unzip
         )
         ;;
 esac
@@ -763,6 +765,17 @@ clone_pinned_if_missing() {
         warn "Impossibile verificare la revisione di $label"
         return 1
     }
+
+    if [[ "$actual_commit" != "$expected_commit" ]] &&
+       git -C "$staged_repo" fetch --depth 1 origin "$expected_commit" &&
+       git -C "$staged_repo" checkout --detach FETCH_HEAD; then
+        actual_commit="$(git -C "$staged_repo" rev-parse HEAD)" || {
+            rm -rf "$temp_dir"
+            warn "Impossibile verificare la revisione di $label"
+            return 1
+        }
+    fi
+
     if [[ "$actual_commit" != "$expected_commit" ]]; then
         rm -rf "$temp_dir"
         warn "Revisione inattesa per $label: attesa $expected_commit, ricevuta $actual_commit"

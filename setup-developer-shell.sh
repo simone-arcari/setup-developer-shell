@@ -1397,7 +1397,7 @@ for cmd in "${CHECK_COMMANDS[@]}"; do
     fi
 done
 
-printf '\n========== FINAL RESULT =========='\n'
+printf '\n========== FINAL RESULT ==========\n'
 printf 'Platform: %s (%s, %s)\n' \
     "$PLATFORM_DISPLAY" "$PLATFORM_FAMILY" "$PACKAGE_MANAGER"
 printf 'OK:       %d\n' "${#OK[@]}"

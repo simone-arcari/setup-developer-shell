@@ -30,6 +30,16 @@ usage() {
     printf '\n'
 }
 
+print_setup_log() {
+    local log_file="$1"
+
+    if (( VERBOSE )); then
+        cat "$log_file"
+    else
+        grep -E '^\[(OK|SKIP|WARN|FAIL)\]' "$log_file" || true
+    fi
+}
+
 while (($#)); do
     case "$1" in
         --verbose)
@@ -150,9 +160,7 @@ run_target() {
         cleanup_target
         return 1
     fi
-    if (( VERBOSE )); then
-        cat "$output_log"
-    fi
+    print_setup_log "$output_log"
     if ! grep -Fq "Family: ${family}; package manager: ${package_manager}" "$output_log"; then
         echo "Unexpected platform detection for $target." >&2
         cat "$output_log"
@@ -166,9 +174,8 @@ run_target() {
         cleanup_target
         return 1
     fi
-    if (( VERBOSE )); then
-        cat "$output_log"
-    else
+    print_setup_log "$output_log"
+    if (( ! VERBOSE )); then
         sed -n '/^========== FINAL RESULT ==========$/,$p' "$output_log"
     fi
 

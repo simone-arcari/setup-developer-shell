@@ -25,11 +25,16 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 targets=(
-    "el8|developer-el8-test|el|dnf"
-    "el9|developer-el9-test|el|dnf"
-    "el10|developer-el10-test|el|dnf"
-    "debian|developer-debian-test|debian|apt-get"
-    "ubuntu|developer-ubuntu-test|debian|apt-get"
+    "el8|developer-el8-test|el|dnf|el/8"
+    "el9|developer-el9-test|el|dnf|el/9"
+    "el10|developer-el10-test|el|dnf|el/10"
+    "debian10|developer-debian10-test|debian|apt-get|debian/10"
+    "debian11|developer-debian11-test|debian|apt-get|debian/11"
+    "debian12|developer-debian12-test|debian|apt-get|debian/12"
+    "debian13|developer-debian-test|debian|apt-get|debian/13"
+    "ubuntu2204|developer-ubuntu2204-test|debian|apt-get|ubuntu/22.04"
+    "ubuntu2404|developer-ubuntu-test|debian|apt-get|ubuntu/24.04"
+    "ubuntu2604|developer-ubuntu2604-test|debian|apt-get|ubuntu/26.04"
 )
 failed=0
 
@@ -38,6 +43,7 @@ run_target() {
     local image="$2"
     local family="$3"
     local package_manager="$4"
+    local dockerfile="$5"
     local container="setup-matrix-${target}-$$"
     local output_log
     local container_created=0
@@ -46,7 +52,7 @@ run_target() {
     printf '\n========== %s (%s) ==========\n' "$target" "$image"
 
     if (( BUILD_IMAGES )); then
-        if ! docker build -f "${ROOT_DIR}/test/${target}/Dockerfile" -t "$image" "$ROOT_DIR"; then
+        if ! docker build -f "${ROOT_DIR}/test/${dockerfile}/Dockerfile" -t "$image" "$ROOT_DIR"; then
             rm -f "$output_log"
             return 1
         fi
@@ -118,8 +124,8 @@ printf '[PASS] %s\n' "$target"
 }
 
 for target_spec in "${targets[@]}"; do
-    IFS='|' read -r target image family package_manager <<<"$target_spec"
-    if ! run_target "$target" "$image" "$family" "$package_manager"; then
+    IFS='|' read -r target image family package_manager dockerfile <<<"$target_spec"
+    if ! run_target "$target" "$image" "$family" "$package_manager" "$dockerfile"; then
         failed=1
         printf '[FAIL] %s\n' "$target" >&2
     fi

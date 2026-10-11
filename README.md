@@ -128,6 +128,18 @@ To reuse previously built `developer-*-test` images:
 test/run-matrix.sh --no-build
 ```
 
+The runner shows a compact per-target summary by default. Use `--verbose` to
+print the full Docker build and setup logs. To run only one target, pass its
+name with `--target`; without this option, every target runs:
+
+```bash
+test/run-matrix.sh --target debian13
+test/run-matrix.sh --target ubuntu2404 --verbose
+test/run-matrix.sh --target el9 --no-build
+```
+
+Run `test/run-matrix.sh --help` to list the available targets and options.
+
 To build one image manually, for example Ubuntu 24.04:
 
 ```bash

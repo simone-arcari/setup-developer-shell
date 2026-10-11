@@ -2,7 +2,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Developer Shell Bootstrap - Rocky Linux / EL 9
+# Developer Shell Bootstrap - Linux and macOS
 # Optional tools are enabled by default.
 # Disable them with: INSTALL_OPTIONAL_TOOLS=0
 # Powerlevel10k: INSTALL_POWERLEVEL10K=1 (default)
@@ -31,6 +31,51 @@ dnf_repo_is_enabled() {
 
     awk -v target="$repo_id" '$1 == target { found=1 } END { exit !found }' \
         <<< "$repo_list"
+}
+
+sha256_check() {
+    local expected="$1"
+    local file="$2"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        printf '%s  %s\n' "$expected" "$file" | sha256sum --check --status
+    elif command -v shasum >/dev/null 2>&1; then
+        printf '%s  %s\n' "$expected" "$file" | shasum -a 256 --check --status
+    else
+        return 2
+    fi
+}
+
+copy_file_mode() {
+    local source="$1"
+    local destination="$2"
+    local mode
+
+    if chmod --reference="$source" "$destination" 2>/dev/null; then
+        return 0
+    fi
+
+    if mode="$(stat -f '%Lp' "$source" 2>/dev/null)"; then
+        chmod "$mode" "$destination"
+        return
+    fi
+
+    return 1
+}
+
+resolve_executable_path() {
+    local path="$1"
+
+    if command -v realpath >/dev/null 2>&1; then
+        realpath "$path" 2>/dev/null && return 0
+    fi
+
+    if readlink -f "$path" >/dev/null 2>&1; then
+        readlink -f "$path"
+        return
+    fi
+
+    printf '%s\n' "$path"
 }
 
 ensure_dnf_config_manager() {
@@ -151,10 +196,10 @@ optional_package_name() {
         el:*)
             printf '%s\n' "$tool"
             ;;
-        debian:git-delta)
+        debian:git-delta|macos:git-delta)
             printf '%s\n' git-delta
             ;;
-        debian:*)
+        debian:*|macos:*)
             printf '%s\n' "$tool"
             ;;
         *)
@@ -174,6 +219,9 @@ optional_package_is_installed() {
             dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
                 grep -q 'install ok installed'
             ;;
+        brew)
+            brew list --formula --versions "$package" >/dev/null 2>&1
+            ;;
         *)
             return 2
             ;;
@@ -191,6 +239,9 @@ install_optional_package() {
             sudo env DEBIAN_FRONTEND=noninteractive \
                 apt-get install -y --no-install-recommends "$package"
             ;;
+        brew)
+            brew install "$package"
+            ;;
         *)
             return 2
             ;;
@@ -198,6 +249,10 @@ install_optional_package() {
 }
 
 install_optional_fallback() {
+    if [[ "$PLATFORM_FAMILY" == "macos" ]]; then
+        return 1
+    fi
+
     case "$1" in
         eza) install_eza_release ;;
         yazi) install_yazi_release ;;
@@ -241,8 +296,9 @@ install_eza_release() {
         return 1
     fi
 
-    if ! command -v sha256sum >/dev/null 2>&1; then
-        warn "Eza non installato: sha256sum non è disponibile per verificare l'archivio."
+    if ! command -v sha256sum >/dev/null 2>&1 &&
+       ! command -v shasum >/dev/null 2>&1; then
+        warn "Eza non installato: manca un comando SHA-256 per verificare l'archivio."
         return 1
     fi
 
@@ -259,8 +315,7 @@ install_eza_release() {
         return 1
     fi
 
-    if ! printf '%s  %s\n' "$expected_sha256" "${temp_dir}/${archive_name}" |
-        sha256sum --check --status; then
+    if ! sha256_check "$expected_sha256" "${temp_dir}/${archive_name}"; then
         rm -rf "$temp_dir"
         warn "Verifica SHA-256 della release Eza v0.23.5 non riuscita."
         return 1
@@ -324,8 +379,9 @@ install_lazygit_release() {
         return 1
     fi
 
-    if ! command -v sha256sum >/dev/null 2>&1; then
-        warn "lazygit non installato: sha256sum non è disponibile per verificare l'archivio."
+    if ! command -v sha256sum >/dev/null 2>&1 &&
+       ! command -v shasum >/dev/null 2>&1; then
+        warn "lazygit non installato: manca un comando SHA-256 per verificare l'archivio."
         return 1
     fi
 
@@ -342,8 +398,7 @@ install_lazygit_release() {
         return 1
     fi
 
-    if ! printf '%s  %s\n' "$expected_sha256" "${temp_dir}/${archive_name}" |
-        sha256sum --check --status; then
+    if ! sha256_check "$expected_sha256" "${temp_dir}/${archive_name}"; then
         rm -rf "$temp_dir"
         warn "Verifica SHA-256 della release lazygit v0.66.0 non riuscita."
         return 1
@@ -407,8 +462,9 @@ install_lazydocker_release() {
         return 1
     fi
 
-    if ! command -v sha256sum >/dev/null 2>&1; then
-        warn "lazydocker non installato: sha256sum non è disponibile per verificare l'archivio."
+    if ! command -v sha256sum >/dev/null 2>&1 &&
+       ! command -v shasum >/dev/null 2>&1; then
+        warn "lazydocker non installato: manca un comando SHA-256 per verificare l'archivio."
         return 1
     fi
 
@@ -425,8 +481,7 @@ install_lazydocker_release() {
         return 1
     fi
 
-    if ! printf '%s  %s\n' "$expected_sha256" "${temp_dir}/${archive_name}" |
-        sha256sum --check --status; then
+    if ! sha256_check "$expected_sha256" "${temp_dir}/${archive_name}"; then
         rm -rf "$temp_dir"
         warn "Verifica SHA-256 della release lazydocker v0.25.2 non riuscita."
         return 1
@@ -492,9 +547,10 @@ install_yazi_release() {
         return 1
     fi
 
-    if ! command -v sha256sum >/dev/null 2>&1 ||
+    if { ! command -v sha256sum >/dev/null 2>&1 &&
+         ! command -v shasum >/dev/null 2>&1; } ||
        ! command -v unzip >/dev/null 2>&1; then
-        warn "Yazi non installato: sha256sum e unzip sono necessari per verificare ed estrarre l'archivio."
+        warn "Yazi non installato: un comando SHA-256 e unzip sono necessari per verificare ed estrarre l'archivio."
         return 1
     fi
 
@@ -512,8 +568,7 @@ install_yazi_release() {
         return 1
     fi
 
-    if ! printf '%s  %s\n' "$expected_sha256" "${temp_dir}/${archive_name}" |
-        sha256sum --check --status; then
+    if ! sha256_check "$expected_sha256" "${temp_dir}/${archive_name}"; then
         rm -rf "$temp_dir"
         warn "Verifica SHA-256 della release Yazi v26.9.1 (musl) non riuscita."
         return 1
@@ -562,6 +617,34 @@ PACKAGE_MANAGER=""
 PLATFORM_DISPLAY=""
 
 detect_platform() {
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        PLATFORM_ID="macos"
+        PLATFORM_VERSION="$(sw_vers -productVersion)"
+        PLATFORM_DISPLAY="macOS ${PLATFORM_VERSION}"
+        PLATFORM_FAMILY="macos"
+        PACKAGE_MANAGER="brew"
+
+        if ! command -v brew >/dev/null 2>&1; then
+            for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+                if [[ -x "$brew_path" ]]; then
+                    eval "$("$brew_path" shellenv)"
+                    break
+                fi
+            done
+        fi
+
+        if ! command -v brew >/dev/null 2>&1; then
+            echo "Homebrew non è installato o non è nel PATH. Installalo seguendo https://brew.sh/ e riesegui lo script." >&2
+            return 1
+        fi
+
+        ID="$PLATFORM_ID"
+        VERSION_ID="$PLATFORM_VERSION"
+        info "Piattaforma rilevata: $PLATFORM_DISPLAY"
+        info "Famiglia: $PLATFORM_FAMILY; package manager: $PACKAGE_MANAGER"
+        return 0
+    fi
+
     if [[ ! -r /etc/os-release ]]; then
         echo "Impossibile leggere /etc/os-release." >&2
         return 1
@@ -623,6 +706,16 @@ install_system_packages() {
                 sudo env DEBIAN_FRONTEND=noninteractive \
                     apt-get install -y --no-install-recommends "$@"
             ;;
+        brew)
+            local package
+            for package in "$@"; do
+                if ! command -v "$package" >/dev/null 2>&1 &&
+                   ! brew list --formula --versions "$package" >/dev/null 2>&1 &&
+                   ! brew install "$package"; then
+                    return 1
+                fi
+            done
+            ;;
         *)
             echo "Package manager non supportato: $PACKAGE_MANAGER." >&2
             return 1
@@ -639,14 +732,16 @@ if ! detect_platform; then
     exit 1
 fi
 
-if ! command -v sudo >/dev/null 2>&1; then
-    echo "sudo non è installato o non è disponibile nel PATH." >&2
-    exit 1
-fi
+if [[ "$PLATFORM_FAMILY" != "macos" ]]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+        echo "sudo non è installato o non è disponibile nel PATH." >&2
+        exit 1
+    fi
 
-if ! sudo -v; then
-    echo "Impossibile ottenere i privilegi sudo." >&2
-    exit 1
+    if ! sudo -v; then
+        echo "Impossibile ottenere i privilegi sudo." >&2
+        exit 1
+    fi
 fi
 
 if [[ -z "${HOME:-}" || ! -d "$HOME" || ! -w "$HOME" ]]; then
@@ -684,6 +779,9 @@ case "$PLATFORM_FAMILY" in
             diffutils hostname tar gzip unzip
         )
         ;;
+    macos)
+        BASE_PACKAGES=(zsh git)
+        ;;
 esac
 
 if ! command -v curl >/dev/null 2>&1; then
@@ -695,11 +793,13 @@ if ! command -v curl >/dev/null 2>&1; then
             fi
         done
         BASE_PACKAGES+=(curl-minimal)
-    else
+    elif [[ "$PLATFORM_FAMILY" == "debian" ]]; then
         if dpkg-query -W -f='${Status}' curl 2>/dev/null | grep -q 'install ok installed'; then
             echo "Il pacchetto curl risulta installato ma il comando non è nel PATH; correggere il sistema prima di continuare." >&2
             exit 1
         fi
+        BASE_PACKAGES+=(curl)
+    else
         BASE_PACKAGES+=(curl)
     fi
 fi
@@ -961,8 +1061,13 @@ alias c='clear'
 # System information
 alias dfh='df -h'
 alias duh='du -sh'
-alias freeh='free -h'
-alias ports='ss -tulpn'
+if [[ "$OSTYPE" == darwin* ]]; then
+    alias freeh='vm_stat'
+    alias ports='lsof -nP -i'
+else
+    alias freeh='free -h'
+    alias ports='ss -tulpn'
+fi
 alias myip='curl -fsS https://api.ipify.org; printf "\n"'
 
 # Safer defaults
@@ -1014,7 +1119,7 @@ else
             fail "Backup degli alias non riuscito"
             exit 1
         fi
-        chmod --reference="$ALIAS_FILE" "$TMP_ALIASES" || {
+        copy_file_mode "$ALIAS_FILE" "$TMP_ALIASES" || {
             rm -f "$TMP_ALIASES"
             fail "Ripristino dei permessi degli alias"
             exit 1
@@ -1098,10 +1203,18 @@ if [[ -o interactive && -t 0 && -t 1 ]]; then
     fi
 
     if command -v fzf >/dev/null 2>&1; then
-        for fzf_key_bindings in \
+        fzf_key_binding_paths=(
             /usr/share/fzf/shell/key-bindings.zsh \
             /usr/share/doc/fzf/shell/key-bindings.zsh \
-            /usr/share/doc/fzf/examples/key-bindings.zsh; do
+            /usr/share/doc/fzf/examples/key-bindings.zsh
+        )
+        if [[ "$OSTYPE" == darwin* ]] && command -v brew >/dev/null 2>&1; then
+            fzf_key_binding_paths+=(
+                "$(brew --prefix fzf 2>/dev/null)/shell/key-bindings.zsh"
+                "$(brew --prefix)/opt/fzf/shell/key-bindings.zsh"
+            )
+        fi
+        for fzf_key_bindings in "${fzf_key_binding_paths[@]}"; do
             if [[ -r "$fzf_key_bindings" ]]; then
                 source "$fzf_key_bindings"
                 break
@@ -1185,7 +1298,7 @@ else
         fail "Backup di .zshrc non riuscito"
         exit 1
     fi
-    chmod --reference="$ZSHRC" "$TMP_ZSHRC" || {
+    copy_file_mode "$ZSHRC" "$TMP_ZSHRC" || {
         rm -f "$TMP_ZSHRC"
         fail "Ripristino dei permessi di .zshrc"
         exit 1
@@ -1217,14 +1330,14 @@ CURRENT_USER="$(id -un)" || {
     CURRENT_USER=""
 }
 REGISTERED_ZSH_PATH=""
-ZSH_REAL_PATH="$(readlink -f "$ZSH_PATH" 2>/dev/null)" || ZSH_REAL_PATH=""
+ZSH_REAL_PATH="$(resolve_executable_path "$ZSH_PATH")" || ZSH_REAL_PATH=""
 
 if [[ ! -x "$ZSH_PATH" ]]; then
     warn "Il percorso di Zsh non è eseguibile; cambio shell saltato."
 elif [[ -n "$ZSH_REAL_PATH" && -r /etc/shells ]]; then
     while IFS= read -r shell_candidate; do
         [[ -x "$shell_candidate" ]] || continue
-        candidate_real_path="$(readlink -f "$shell_candidate" 2>/dev/null)" || continue
+        candidate_real_path="$(resolve_executable_path "$shell_candidate")" || continue
         if [[ "$candidate_real_path" == "$ZSH_REAL_PATH" ]]; then
             REGISTERED_ZSH_PATH="$shell_candidate"
             break
@@ -1237,10 +1350,19 @@ if [[ -z "$CURRENT_USER" ]]; then
 elif [[ -z "$REGISTERED_ZSH_PATH" ]]; then
     skip "Zsh non è registrato in /etc/shells; shell predefinita invariata"
 elif command -v chsh >/dev/null 2>&1; then
-    CURRENT_LOGIN_SHELL="$(getent passwd "$CURRENT_USER" | awk -F: 'NR == 1 { print $7 }')"
+    if [[ "$PLATFORM_FAMILY" == "macos" ]]; then
+        CURRENT_LOGIN_SHELL="$(dscl . -read "/Users/$CURRENT_USER" UserShell 2>/dev/null |
+            awk '{ print $2 }')"
+    else
+        CURRENT_LOGIN_SHELL="$(getent passwd "$CURRENT_USER" | awk -F: 'NR == 1 { print $7 }')"
+    fi
     if [[ "$CURRENT_LOGIN_SHELL" == "$REGISTERED_ZSH_PATH" ]]; then
         skip "Zsh è già la shell predefinita per $CURRENT_USER"
-    elif sudo chsh -s "$REGISTERED_ZSH_PATH" "$CURRENT_USER"; then
+    elif [[ "$PLATFORM_FAMILY" == "macos" ]] &&
+         chsh -s "$REGISTERED_ZSH_PATH" "$CURRENT_USER"; then
+        ok "Shell predefinita impostata su Zsh"
+    elif [[ "$PLATFORM_FAMILY" != "macos" ]] &&
+         sudo chsh -s "$REGISTERED_ZSH_PATH" "$CURRENT_USER"; then
         ok "Shell predefinita impostata su Zsh"
     else
         warn "Impossibile impostare la shell predefinita di $CURRENT_USER; avvia Zsh con: zsh"
@@ -1255,10 +1377,17 @@ fi
 
 log "Verifica dei comandi"
 
-CHECK_COMMANDS=(
-    zsh git curl ls grep df du ss free hostname
-    fzf bat rg btop nvim zoxide eza lazygit lazydocker delta micro yazi
-)
+if [[ "$PLATFORM_FAMILY" == "macos" ]]; then
+    CHECK_COMMANDS=(
+        zsh git curl ls grep df du vm_stat lsof hostname brew
+        fzf bat rg btop nvim zoxide eza lazygit lazydocker delta micro yazi
+    )
+else
+    CHECK_COMMANDS=(
+        zsh git curl ls grep df du ss free hostname
+        fzf bat rg btop nvim zoxide eza lazygit lazydocker delta micro yazi
+    )
+fi
 
 for cmd in "${CHECK_COMMANDS[@]}"; do
     if command -v "$cmd" >/dev/null 2>&1; then

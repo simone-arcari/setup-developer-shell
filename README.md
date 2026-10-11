@@ -1,11 +1,11 @@
 # Developer Shell Setup
 
 `setup-developer-shell.sh` prepares a practical Zsh environment for day-to-day
-use on your Linux machine. It installs the system packages it needs, configures
-[Oh My Zsh](https://ohmyz.sh/) with useful plugins and the Powerlevel10k theme,
-adds optional command-line tools, and writes a set of shell aliases. It is
-designed to be run directly by a regular user on the machine you want to
-configure, not as a Docker entrypoint.
+use on your Linux or macOS machine. It installs the system packages it needs,
+configures [Oh My Zsh](https://ohmyz.sh/) with useful plugins and the
+Powerlevel10k theme, adds optional command-line tools, and writes a set of
+shell aliases. It is designed to be run directly by a regular user on the
+machine you want to configure.
 
 ## Supported platforms
 
@@ -14,6 +14,8 @@ The script recognizes and has been tested on:
 - Enterprise Linux (EL) family: Rocky Linux 8, 9, and 10
 - Debian 10, 11, 12, and 13
 - Ubuntu 22.04, 24.04, and 26.04
+- macOS with Homebrew (smoke-tested on macOS 26.3, Apple Silicon; optional
+  package installation through Homebrew has not yet been exercised)
 
 Debian 10 and 11 are end-of-life legacy compatibility targets and are not
 recommended for new installations. The EL package flow is also designed for
@@ -24,17 +26,25 @@ configuration on RHEL is left to the administrator.
 
 Optional package availability depends on the enabled repositories and
 architecture. If an optional package is unavailable, the script reports a
-warning; Eza, Yazi, lazygit, and lazydocker have pinned upstream release
-fallbacks for aarch64/ARM64 and x86_64. Downloads are SHA-256 verified before
-installation under `~/.local/bin`.
+warning; on Linux, Eza, Yazi, lazygit, and lazydocker have pinned upstream
+release fallbacks for aarch64/ARM64 and x86_64. Downloads are SHA-256 verified
+before installation under `~/.local/bin`. On macOS, optional tools are
+installed through Homebrew.
 
 ## Run on your machine
 
-Requirements:
+Requirements on Linux:
 
 - A supported Linux distribution and Bash
 - A regular user account with working `sudo` access
 - Network access to the configured package repositories and GitHub
+
+On macOS, install Homebrew yourself before running the script. The script
+detects Homebrew in the current `PATH` or at its standard Apple Silicon and
+Intel locations, and stops with installation instructions if it is missing.
+It uses Homebrew for packages and does not require `sudo` for package
+installation. The macOS smoke test was run with optional package installation
+disabled.
 
 Review the script, then run it as your regular user from the repository:
 
@@ -42,8 +52,11 @@ Review the script, then run it as your regular user from the repository:
 bash setup-developer-shell.sh
 ```
 
-Do not run it as root. The script asks `sudo` for permission when system
-packages or supported EL9 repositories need to be changed.
+Do not run it as root. On Linux, the script asks `sudo` for permission when
+system packages or supported EL9 repositories need to be changed. On macOS,
+Homebrew installs packages as the current user. The script only changes your
+login shell if the selected Zsh is already registered in `/etc/shells` and
+the system allows the change; otherwise, start Zsh with `zsh`.
 
 Optional command-line tools are installed by default. To skip them:
 
@@ -59,9 +72,8 @@ INSTALL_POWERLEVEL10K=0 bash setup-developer-shell.sh
 
 The script adds or updates a marked section in `~/.zshrc`, writes aliases to
 `~/.config/developer-shell/aliases.zsh`, and backs up existing files before
-changing them. It attempts to make Zsh your login shell when possible; if the
-system does not allow that, start it with `zsh`. Read the final summary for
-optional-tool warnings or steps that need attention.
+changing them. Read the final summary for optional-tool warnings or steps that
+need attention.
 
 The optional tools are fzf, bat, ripgrep, btop, Neovim, zoxide, Eza, lazygit,
 lazydocker, git-delta, micro, and Yazi. Eza is the maintained successor to
@@ -74,9 +86,10 @@ the corresponding references and checksums in `setup-developer-shell.sh`.
 
 ## Test across Linux platforms with Docker
 
-Docker is only used here to test the setup script against disposable
-environments; it is not required to run the script on your own machine. The
-Dockerfiles under `test/` provide one test image per distribution version:
+Docker is only used here to test the script against disposable Linux
+environments; it is not required to run the script on your own machine and
+does not test macOS. The Dockerfiles under `test/` provide one image per
+distribution version:
 
 ```text
 test/

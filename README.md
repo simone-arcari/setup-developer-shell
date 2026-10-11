@@ -1,7 +1,7 @@
 # Developer Shell Setup
 
-`setup-terminal.sh` prepares a practical Zsh environment for day-to-day use on
-your Linux machine. It installs the system packages it needs, configures
+`setup-developer-shell.sh` prepares a practical Zsh environment for day-to-day
+use on your Linux machine. It installs the system packages it needs, configures
 [Oh My Zsh](https://ohmyz.sh/) with useful plugins and the Powerlevel10k theme,
 adds optional command-line tools, and writes a set of shell aliases. It is
 designed to be run directly by a regular user on the machine you want to
@@ -39,7 +39,7 @@ Requirements:
 Review the script, then run it as your regular user from the repository:
 
 ```bash
-bash setup-terminal.sh
+bash setup-developer-shell.sh
 ```
 
 Do not run it as root. The script asks `sudo` for permission when system
@@ -48,13 +48,13 @@ packages or supported EL9 repositories need to be changed.
 Optional command-line tools are installed by default. To skip them:
 
 ```bash
-INSTALL_OPTIONAL_TOOLS=0 bash setup-terminal.sh
+INSTALL_OPTIONAL_TOOLS=0 bash setup-developer-shell.sh
 ```
 
 Powerlevel10k is also enabled by default. To use Oh My Zsh without that theme:
 
 ```bash
-INSTALL_POWERLEVEL10K=0 bash setup-terminal.sh
+INSTALL_POWERLEVEL10K=0 bash setup-developer-shell.sh
 ```
 
 The script adds or updates a marked section in `~/.zshrc`, writes aliases to
@@ -70,7 +70,7 @@ working Docker CLI and daemon to be useful.
 
 Oh My Zsh, its plugins, Powerlevel10k, and the upstream binary fallbacks are
 pinned to specific revisions or versions. Updating them requires reviewing
-the corresponding references and checksums in `setup-terminal.sh`.
+the corresponding references and checksums in `setup-developer-shell.sh`.
 
 ## Test across Linux platforms with Docker
 

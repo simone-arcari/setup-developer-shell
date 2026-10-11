@@ -1287,6 +1287,6 @@ if ((${#FAILURES[@]})); then
 fi
 
 printf '\nAvvia la shell configurata con: zsh\n'
-printf 'Per disabilitare i tool opzionali: INSTALL_OPTIONAL_TOOLS=0 bash setup-terminal.sh\n'
+printf 'Per disabilitare i tool opzionali: INSTALL_OPTIONAL_TOOLS=0 bash setup-developer-shell.sh\n'
 
 ((${#FAILURES[@]} == 0))

@@ -60,7 +60,7 @@ run_target() {
 
     if ! docker run -d \
         --name "$container" \
-        -v "${ROOT_DIR}/setup-terminal.sh:/tmp/setup-terminal.sh:ro" \
+        -v "${ROOT_DIR}/setup-developer-shell.sh:/tmp/setup-developer-shell.sh:ro" \
         "$image" bash -c 'sleep infinity' >/dev/null; then
         rm -f "$output_log"
         return 1
@@ -75,7 +75,7 @@ run_target() {
         rm -f "$output_log"
     }
 
-    if ! docker exec "$container" bash /tmp/setup-terminal.sh >"$output_log" 2>&1; then
+    if ! docker exec "$container" bash /tmp/setup-developer-shell.sh >"$output_log" 2>&1; then
         cat "$output_log"
         cleanup_target
         return 1
@@ -87,7 +87,7 @@ run_target() {
         return 1
     fi
 
-    if ! docker exec "$container" bash /tmp/setup-terminal.sh >"$output_log" 2>&1; then
+    if ! docker exec "$container" bash /tmp/setup-developer-shell.sh >"$output_log" 2>&1; then
         cat "$output_log"
         cleanup_target
         return 1
